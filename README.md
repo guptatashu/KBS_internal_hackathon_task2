@@ -1,3 +1,4 @@
+
 # Chain-Mind
 
 **A smart-contract intelligence report for any verified Ethereum contract: paste an address, get a structured, evidence-backed summary of what the contract does, who controls it, and where funds can move.**
@@ -167,3 +168,5 @@ tests/                     unit and web-layer tests
 ---
 
 *Chain-Mind was built for a hackathon with AI assistance. Use it to decide where to look, not to decide whether to trust.*
+# KBS_internal_hackathon_task2
+e4e51b62c1f2c28062bb21ffcc958d8616922d5a

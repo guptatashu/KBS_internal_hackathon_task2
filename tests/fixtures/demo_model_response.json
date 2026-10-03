@@ -1,0 +1,62 @@
+{
+  "contractPurpose": "A minimal ETH wallet that accepts deposits from anyone and lets its owner sweep the entire balance to an address of their choice.",
+  "riskLevel": "HIGH",
+  "summary": "Wallet stores the deploying account as owner (line 5), accepts plain ETH transfers (line 9) and exposes one function, sweep, that sends the whole balance to a caller-supplied address (lines 11-13). Access to sweep is decided with tx.origin instead of msg.sender (line 12). That combination lets a malicious contract the owner interacts with redirect the whole balance. There is no way to change the owner.",
+  "riskReasoning": "The scanner's HIGH tx-origin signal is confirmed by the code: the only authorization check on a fund-moving function uses tx.origin. The fund-withdrawal signal is also confirmed: sweep moves the full balance in one call. Together these are the basis for HIGH. The code is short and fully visible, so no unseen inheritance is assumed.",
+  "keyFunctions": [
+    { "name": "sweep", "visibility": "external", "description": "Sends the contract's entire ETH balance to the address passed as `to`, if tx.origin equals owner." },
+    { "name": "receive", "visibility": "external", "description": "Accepts plain ETH transfers with no logic." }
+  ],
+  "permissions": [
+    { "role": "owner (set to the deployer at line 5)", "capabilities": ["sweep the full ETH balance to any address"], "functions": ["sweep"] },
+    { "role": "any caller", "capabilities": ["deposit ETH"], "functions": ["receive"] }
+  ],
+  "fundMovement": [
+    { "function": "sweep", "mechanism": "ETH transfer", "accessControl": "require(tx.origin == owner) at line 12", "description": "Transfers address(this).balance to `to` using transfer (line 13)." }
+  ],
+  "externalCalls": [
+    { "function": "sweep", "kind": "transfer", "target": "`to` (caller-supplied address)", "description": "Sends ETH with the fixed 2300 gas stipend of transfer (line 13)." }
+  ],
+  "securityFindings": [
+    {
+      "title": "Authorization based on tx.origin",
+      "severity": "HIGH",
+      "observed": "Line 12 requires tx.origin == owner before sweep sends the whole balance (line 13).",
+      "potentialRisk": "If the owner ever calls a malicious contract, that contract could call sweep in the same transaction; tx.origin would still be the owner, so the check passes and the funds could go to an address the attacker picks.",
+      "evidence": [ { "file": "Wallet.sol", "line": 12 } ],
+      "scannerRule": "tx-origin",
+      "confidence": "HIGH"
+    },
+    {
+      "title": "Entire balance movable by a single account in one call",
+      "severity": "MEDIUM",
+      "observed": "sweep (line 11) is external and transfers address(this).balance (line 13) to any address given by the caller.",
+      "potentialRisk": "Safety depends entirely on protection of the owner key; there is no limit, delay or second approver.",
+      "evidence": [ { "file": "Wallet.sol", "line": 11 }, { "file": "Wallet.sol", "line": 13 } ],
+      "scannerRule": "fund-withdrawal",
+      "confidence": "HIGH"
+    },
+    {
+      "title": "Owner cannot be changed",
+      "severity": "LOW",
+      "observed": "owner is assigned once at line 5 and no function in the provided source modifies it.",
+      "potentialRisk": "If the owner key is lost, the balance cannot be withdrawn; if it is compromised, the owner cannot be rotated.",
+      "evidence": [ { "file": "Wallet.sol", "line": 5 } ],
+      "scannerRule": null,
+      "confidence": "MEDIUM"
+    }
+  ],
+  "interactionRisks": [
+    { "description": "A phishing or malicious contract that the owner interacts with could trigger sweep on the owner's behalf.", "dependsOn": "the owner calling an attacker-controlled contract" },
+    { "description": "Sweeping to a contract address whose receive/fallback needs more than 2300 gas would revert.", "dependsOn": "`to` being a contract with a non-trivial fallback" }
+  ],
+  "recommendations": [
+    "Confirm whether authorization should use msg.sender instead of tx.origin.",
+    "Check how the owner key is stored and whether a multisig or ownership-transfer mechanism is expected.",
+    "Check whether sweeping to contract recipients (2300 gas limit of transfer) is a supported use case."
+  ],
+  "limitations": [
+    "Only the provided source text was analyzed; the contract was not compiled, deployed or executed.",
+    "The source is a single file with no imports or inheritance."
+  ]
+}
